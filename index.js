@@ -1,9 +1,8 @@
 const csv = require('csv-parser')
 const fs = require('fs')
-const results = [];
 const Transform = require('stream').Transform;
 
-const upperCaseTransform = new Transform({
+const addHeaders = new Transform({
     transform: (chunk, encoding, done) => {
         const headers =  'primary,secondary,name,address,dataType'
         const newLine = '\r\n'
@@ -16,29 +15,25 @@ const upperCaseTransform = new Transform({
     }
 })
 
-fs.createReadStream('data.csv')
-  .pipe(upperCaseTransform)
-  .pipe(csv())
-  .on('data', (data) => results.push(data))
-  .on('end', () => {
 
+function writeLine(line) {
+    fs.writeFileSync(outputFileName, `\n${line}`, { flag: 'a+' }, _err => {});
+}
 
-    writeSwitches(results)
-    writeBinarySensors(results)
-    writeSensors(results)
+function switchesOnly() {
+    return groupObject => groupObject.address.includes('/3/') && !groupObject.name.includes('LED') && groupObject.name !== '';
+}
 
-  });
+function binarySensorsOnly() {
+    return groupObject => groupObject.address.includes('/2/') && groupObject.name !== '';
+}
 
+function sensorsOnly() {
+    return groupObject => groupObject.address.includes('/1/') && groupObject.name !== '';
+}
 
-
-
-  function writeLine(line, indentation) {
-    const tab = ' '
-    fs.writeFileSync('knx.yaml', `\n${line}`, { flag: 'a+' }, err => {});
-  }
-
-  function writeSwitches(groupObjects = []) {
-        const switches = groupObjects.filter(address => address.address.includes('/3/') && !address.name.includes('LED') && address.name !== '');
+function writeSwitches(groupObjects = []) {
+        const switches = groupObjects.filter(switchesOnly);
 
         writeLine('switch:')
         switches.forEach(s => {
@@ -47,9 +42,8 @@ fs.createReadStream('data.csv')
         });
   }
 
-
-  function writeBinarySensors(groupObjects = []) {
-        const binary_sensors = groupObjects.filter(address => address.address.includes('/2/') && address.name !== '');
+function writeBinarySensors(groupObjects = []) {
+        const binary_sensors = groupObjects.filter(binarySensorsOnly);
 
         writeLine('binary_sensor:')
         binary_sensors.forEach(bs => {
@@ -59,8 +53,8 @@ fs.createReadStream('data.csv')
         });
   }
 
-  function writeSensors(groupObjects = []) {
-        const sensors = groupObjects.filter(address => address.address.includes('/1/') && address.name !== '')
+function writeSensors(groupObjects = []) {
+        const sensors = groupObjects.filter(sensorsOnly)
 
         writeLine('sensor:')
         sensors.forEach(s => {
@@ -68,8 +62,32 @@ fs.createReadStream('data.csv')
           writeLine(`   state_address: "${s.address}"`);
           writeLine(`   type: ${getSensorType(s)}`);
         });
+
+        function getSensorType(sensor) {
+            return sensor.name.includes('jas') ? 'brightness' : 'temperature'
+        }
   }
 
-  function getSensorType(sensor) {
-    return sensor.name.includes('jas') ? 'brightness' : 'temperature'
-  }
+
+function writeHomeAssistantYaml(groupObjects) {
+    writeSwitches(groupObjects)
+    writeBinarySensors(groupObjects)
+    writeSensors(groupObjects)
+}
+
+
+function transform(sourceFileName) {
+    const groupObjects = [];
+    fs.createReadStream(sourceFileName)
+        .pipe(addHeaders)
+        .pipe(csv())
+        .on('data', (data) => groupObjects.push(data))
+        .on('end', () => writeHomeAssistantYaml(groupObjects));
+}
+
+// Actual transformation run with given parameters or defaults
+const sourceFileName = process.argv[2] || 'knx.csv'
+const outputFileName = process.argv[3] || 'ha.yaml'
+
+transform(sourceFileName);
+
