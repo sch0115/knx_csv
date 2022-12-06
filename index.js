@@ -1,9 +1,23 @@
 const csv = require('csv-parser')
 const fs = require('fs')
 const results = [];
+const Transform = require('stream').Transform;
 
+const upperCaseTransform = new Transform({
+    transform: (chunk, encoding, done) => {
+        const headers =  'primary,secondary,name,address,dataType'
+        const newLine = '\r\n'
+        const fileContent = chunk.toString()
+        if (fileContent.includes(headers)) {
+            done(null, fileContent)
+        } else {
+            done(null, headers + newLine + fileContent)
+        }
+    }
+})
 
 fs.createReadStream('data.csv')
+  .pipe(upperCaseTransform)
   .pipe(csv())
   .on('data', (data) => results.push(data))
   .on('end', () => {
@@ -16,13 +30,15 @@ fs.createReadStream('data.csv')
   });
 
 
+
+
   function writeLine(line, indentation) {
     const tab = ' '
     fs.writeFileSync('knx.yaml', `\n${line}`, { flag: 'a+' }, err => {});
   }
 
   function writeSwitches(groupObjects = []) {
-        const switches = groupObjects.filter(address => address.address.includes('/3/') && !address.name.includes('LED') && address.name !== ' ');
+        const switches = groupObjects.filter(address => address.address.includes('/3/') && !address.name.includes('LED') && address.name !== '');
 
         writeLine('switch:')
         switches.forEach(s => {
@@ -33,7 +49,7 @@ fs.createReadStream('data.csv')
 
 
   function writeBinarySensors(groupObjects = []) {
-        const binary_sensors = groupObjects.filter(address => address.address.includes('/2/') && address.name !== ' ');
+        const binary_sensors = groupObjects.filter(address => address.address.includes('/2/') && address.name !== '');
 
         writeLine('binary_sensor:')
         binary_sensors.forEach(bs => {
@@ -44,7 +60,7 @@ fs.createReadStream('data.csv')
   }
 
   function writeSensors(groupObjects = []) {
-        const sensors = groupObjects.filter(address => address.address.includes('/1/') && address.name !== ' ')
+        const sensors = groupObjects.filter(address => address.address.includes('/1/') && address.name !== '')
 
         writeLine('sensor:')
         sensors.forEach(s => {
