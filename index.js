@@ -20,22 +20,50 @@ function writeLine(line) {
     fs.writeFileSync(outputFileName, `\n${line}`, { flag: 'a+' }, _err => {});
 }
 
-function switchesOnly() {
-    return groupObject => groupObject.address.includes('/3/') && !groupObject.name.includes('LED') && groupObject.name !== '';
+function othersOnly(groupObject) {
+    return groupObject.address.includes('/4/') && groupObject.name !== '' && groupObject.name !== ' ';
 }
 
-function binarySensorsOnly() {
-    return groupObject => groupObject.address.includes('/2/') && groupObject.name !== '';
+function buttonsOnly(groupObject) {
+    return groupObject.address.includes('/3/') && groupObject.name !== '' && groupObject.name !== ' ';
 }
 
-function sensorsOnly() {
-    return groupObject => groupObject.address.includes('/1/') && groupObject.name !== '';
+function switchesOnly(groupObject) {
+    return groupObject.address.includes('/0/') && groupObject.name !== '' && groupObject.name !== ' ';
 }
+
+function binarySensorsOnly(groupObject) {
+    return groupObject.address.includes('/2/') && groupObject.name !== '' && groupObject.name !== ' ';
+}
+
+function sensorsOnly(groupObject) {
+    return groupObject.address.includes('/1/') && groupObject.name !== '' && groupObject.name !== ' ';
+}
+
+function writeButtons(groupObjects = []) {
+        const buttons = groupObjects.filter(buttonsOnly);
+
+        writeLine('switch:')
+        buttons.forEach(s => {
+            writeLine(` - name: "${s.name}"`);
+            writeLine(`   address: "${s.address}"`);
+        });
+  }
 
 function writeSwitches(groupObjects = []) {
         const switches = groupObjects.filter(switchesOnly);
 
         writeLine('switch:')
+        switches.forEach(s => {
+          writeLine(` - name: "${s.name}"`);
+          writeLine(`   address: "${s.address}"`);
+        });
+  }
+
+function writeOthers(groupObjects = []) {
+        const switches = groupObjects.filter(othersOnly);
+
+        writeLine('others-FAKE-notWORKING:')
         switches.forEach(s => {
           writeLine(` - name: "${s.name}"`);
           writeLine(`   address: "${s.address}"`);
@@ -63,16 +91,26 @@ function writeSensors(groupObjects = []) {
           writeLine(`   type: ${getSensorType(s)}`);
         });
 
-        function getSensorType(sensor) {
-            return sensor.name.includes('jas') ? 'brightness' : 'temperature'
+    function getSensorType(sensor) {
+        const sensor_type = sensor.name.split(' ')[sensor.name.split(' ').length-1]
+        switch (sensor_type) {
+            case 'jas':
+                return 'brightness'
+            case 'teplota':
+                return 'temperature'
+            default:
+                return 'humidity'
         }
-  }
+    }
+}
 
 
 function writeHomeAssistantYaml(groupObjects) {
     writeSwitches(groupObjects)
-    writeBinarySensors(groupObjects)
+    // writeButtons(groupObjects)
     writeSensors(groupObjects)
+    writeBinarySensors(groupObjects)
+    // writeOthers(groupObjects)
 }
 
 
@@ -90,4 +128,5 @@ const sourceFileName = process.argv[2] || 'knx.csv'
 const outputFileName = process.argv[3] || 'ha.yaml'
 
 transform(sourceFileName);
+console.log('Successfully converted')
 
